@@ -1,10 +1,13 @@
 import os
 import base64
+import json
 from io import BytesIO
-from dotenv import load_dotenv
+
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from fastapi import HTTPException
+from dotenv import load_dotenv
+from src.api_azure_openai.service import structure_ocr_text
 
 load_dotenv()
 
@@ -36,7 +39,6 @@ async def extract_text_from_base64_pdf(file_name: str, base64_pdf: str):
 
         ocr_pages = []
 
-        # ✅ Preferred: pages (if available)
         if result.pages:
             for page in result.pages:
                 lines = []
@@ -48,7 +50,6 @@ async def extract_text_from_base64_pdf(file_name: str, base64_pdf: str):
                     "text": "\n".join(lines)
                 })
 
-        # ✅ Fallback: full document content
         elif result.content:
             ocr_pages.append({
                 "page": 1,
@@ -61,11 +62,20 @@ async def extract_text_from_base64_pdf(file_name: str, base64_pdf: str):
                 detail="OCR completed but no text content returned"
             )
 
+        # 🔹 Combine OCR text for LLM
+        combined_text = "\n\n".join(
+            f"Page {p['page']}:\n{p['text']}" for p in ocr_pages
+        )
+
+        # 🔹 Call Azure OpenAI structuring
+        structured_result = structure_ocr_text(combined_text)
+
         return {
             "file_name": file_name,
             "pages": len(ocr_pages),
             "ocr_text": ocr_pages,
-            "ocr_length": len(base64_pdf)
+            "structured_data": structured_result,
+            "ocr_length": len(base64_pdf),
         }
 
     except Exception as e:

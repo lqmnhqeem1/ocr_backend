@@ -15,3 +15,10 @@ app.add_middleware(
 
 # Include Azure OCR router
 app.include_router(azuredoc_router)
+
+
+if __name__ == "__main__":
+    # Launch the FastAPI app when executed as a module (python -m src.main)
+    import uvicorn
+
+    uvicorn.run("src.main:app", host="0.0.0.0", port=8000, reload=True)
